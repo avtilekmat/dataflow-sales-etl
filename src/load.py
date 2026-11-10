@@ -61,9 +61,3 @@ def load_data(df):
 
 
 
-if __name__ == "__main__":
-    engine = get_engine()
-
-    with engine.connect() as connection:
-        result = connection.execute(text("SELECT 1"))
-        print(result.scalar())
