@@ -16,7 +16,3 @@ def transform_data(df):
 
     return df
 
-if __name__ == "__main__":
-    df = extract_data()
-    result = transform_data(df)
-    print(result.head())

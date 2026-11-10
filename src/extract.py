@@ -12,6 +12,3 @@ def extract_data():
     return df
 
 
-if __name__ == "__main__":
-    result = extract_data()
-    print(result.head())
