@@ -1,3 +1,4 @@
+
 import sys
 from pathlib import Path
 
@@ -5,6 +6,7 @@ import pandas as pd
 from PyQt5 import QtWidgets, QtCore
 
 from src.ui.table_model import PandasTableModel
+from src.ui.dashboard import Dashboard
 from src.transform import transform_data
 from src.analytics import analyze_sales
 
@@ -14,7 +16,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
 
         self.setWindowTitle("DataFlow — Sales Analytics")
-        self.resize(1100, 700)
+        self.resize(1200, 850)
 
         self.df = None
         self.table_model = None
@@ -23,8 +25,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.central_widget)
 
         self.main_layout = QtWidgets.QVBoxLayout(self.central_widget)
-        self.main_layout.setContentsMargins(30, 30, 30, 30)
-        self.main_layout.setSpacing(20)
+        self.main_layout.setContentsMargins(25, 25, 25, 25)
+        self.main_layout.setSpacing(15)
 
         self.title = QtWidgets.QLabel("DataFlow — Sales Analytics")
         self.title.setStyleSheet("""
@@ -43,7 +45,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 border-radius: 12px;
                 font-size: 16px;
                 font-weight: bold;
-                padding: 10px;
             }
             QPushButton:hover {
                 background-color: #1565C0;
@@ -57,10 +58,7 @@ class MainWindow(QtWidgets.QMainWindow):
             QtWidgets.QAbstractItemView.NoEditTriggers
         )
         self.table.setAlternatingRowColors(True)
-        self.table.setSelectionBehavior(
-            QtWidgets.QAbstractItemView.SelectRows
-        )
-        self.main_layout.addWidget(self.table)
+        self.main_layout.addWidget(self.table, stretch=2)
 
         self.status_label = QtWidgets.QLabel(
             "CSV-файл пока не загружен"
@@ -74,12 +72,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.analyze_button.clicked.connect(self.run_analysis)
         self.main_layout.addWidget(self.analyze_button)
 
-        self.results_label = QtWidgets.QLabel("")
-        self.results_label.setStyleSheet("""
-            font-size: 17px;
-            padding: 12px;
-        """)
-        self.main_layout.addWidget(self.results_label)
+        self.dashboard = Dashboard()
+        self.dashboard.hide()
+        self.main_layout.addWidget(self.dashboard, stretch=3)
 
     def load_csv(self):
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
@@ -104,30 +99,30 @@ class MainWindow(QtWidgets.QMainWindow):
                 "order_date"
             }
 
-            missing_columns = required_columns - set(df.columns)
+            missing = required_columns - set(df.columns)
 
-            if missing_columns:
+            if missing:
                 raise ValueError(
                     "Отсутствуют столбцы: "
-                    + ", ".join(sorted(missing_columns))
+                    + ", ".join(sorted(missing))
                 )
 
             if df.empty:
-                raise ValueError("CSV-файл не содержит данных.")
+                raise ValueError("CSV-файл пуст.")
 
             self.df = df
             self.table_model = PandasTableModel(df)
             self.table.setModel(self.table_model)
             self.table.resizeColumnsToContents()
 
+            self.dashboard.hide()
+            self.analyze_button.setEnabled(True)
+
             self.status_label.setText(
                 f"Файл: {Path(file_path).name} | "
                 f"Строк: {len(df)} | "
                 f"Столбцов: {len(df.columns)}"
             )
-
-            self.results_label.clear()
-            self.analyze_button.setEnabled(True)
 
         except Exception as error:
             QtWidgets.QMessageBox.critical(
@@ -142,17 +137,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
         try:
             cleaned_df = transform_data(self.df.copy())
+            if cleaned_df.empty:
+                raise ValueError(
+                    "После очистки не осталось корректных строк."
+                )
+
             stats = analyze_sales(cleaned_df)
 
-            self.results_label.setText(
-                f"Заказов: {stats['orders']}  |  "
-                f"Выручка: {stats['revenue']:,.2f}  |  "
-                f"Средний чек: {stats['average_order']:,.2f}  |  "
-                f"Продано единиц: {stats['products_sold']}"
-            )
+            self.dashboard.update_dashboard(cleaned_df, stats)
+            self.dashboard.show()
 
             self.status_label.setText(
-                f"Обработано строк: {len(self.df)} | "
+                f"Исходных строк: {len(self.df)} | "
                 f"Корректных: {len(cleaned_df)} | "
                 f"Удалено: {len(self.df) - len(cleaned_df)}"
             )
